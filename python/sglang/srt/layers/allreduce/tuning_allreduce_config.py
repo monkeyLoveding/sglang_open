@@ -388,6 +388,7 @@ def main(args):
         model_path=args.model if args.model else "mock_model",
         tp_size=world_size,
         enable_symm_mem=True,  # Enable symmetric memory for tuning
+        trust_remote_code=True,  # Allow loading models with custom code
     )
     set_global_server_args_for_scheduler(mock_server_args)
     
