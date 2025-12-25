@@ -203,3 +203,28 @@ jobs:
           export PATH="/usr/local/Ascend/8.3.RC1/compiler/bishengir/bin:${PATH}"
           cd test/srt
           python3 run_suite.py --suite per-commit-16-npu-a3 --timeout-per-file 3600 --auto-partition-id ${{ matrix.part }} --auto-partition-size 2
+
+  per-commit-diffusion-1-npu-a2:
+    runs-on: ubuntu-22.04-arm
+    container:
+      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/cann:8.3.rc2-910b-ubuntu22.04-py3.11
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          bash scripts/ci/npu_ci_install_dependency.sh 910b
+      - name: Run test
+        timeout-minutes: 60
+        env:
+          SGLANG_USE_MODELSCOPE: true
+          SGLANG_IS_IN_CI: true
+          HF_ENDPOINT: https://hf-mirror.com
+          TORCH_EXTENSIONS_DIR: /tmp/torch_extensions
+          PYTORCH_NPU_ALLOC_CONF: "expandable_segments:True"
+          STREAMS_PER_DEVICE: 32
+        run: |
+          export PATH="/usr/local/Ascend/8.3.RC1/compiler/bishengir/bin:${PATH}"
+          cd python
+          python3 sglang/multimodal_gen/test/run_suite.py --suite 1-npu
