@@ -7,35 +7,35 @@ on:
     branches: [oidc-test]
 
 permissions:
+  id-token: write
   contents: read
 
 jobs:
-  job-level-idtoken:
-    # Job-level id-token declaration (official docs: can be set on job level)
+  wf-level-only:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     steps:
-      - name: Try request OIDC token
+      - name: Try request OIDC token (workflow-level declaration)
         run: |
           echo "event=$GITHUB_EVENT_NAME"
           if [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
-            echo "REQUEST_URL exists: ${ACTIONS_ID_TOKEN_REQUEST_URL}"
-            echo "--- response (first 250 chars) ---"
+            echo "WF-LEVEL: env vars PRESENT, requesting token..."
             curl -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=oidc-experiment" | head -c 250
-            echo ""
-            echo "--- OIDC TOKEN REQUEST SUCCEEDED ---"
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=oidc-experiment" | head -c 100
           else
-            echo "ACTIONS_ID_TOKEN_REQUEST_URL missing => id-token NOT granted"
+            echo "WF-LEVEL: env vars MISSING => id-token NOT granted"
           fi
 
-  wf-level-idtoken:
-    # Workflow-level has contents:read only; declare id-token on the job scope above vs this one for contrast
+  job-level-control:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
-      - name: Check env vars only
+      - name: Control - job-level declaration
         run: |
-          echo "event=$GITHUB_EVENT_NAME"
-          printenv | grep -E '^ACTIONS_ID_TOKEN' || echo "no ACTIONS_ID_TOKEN env vars in this job"
+          if [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+            echo "JOB-LEVEL: env vars PRESENT, requesting token..."
+            curl -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=oidc-experiment" | head -c 100
+          else
+            echo "JOB-LEVEL: env vars MISSING => id-token NOT granted"
+          fi
