@@ -1,0 +1,56 @@
+name: Test OIDC on pull_request
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [oidc-test]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  oidc-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request OIDC token
+        run: |
+          echo "=== Event info ==="
+          echo "GITHUB_EVENT_NAME = $GITHUB_EVENT_NAME"
+          echo "GITHUB_REPOSITORY  = $GITHUB_REPOSITORY"
+          echo "GITHUB_REF         = $GITHUB_REF"
+          echo ""
+          echo "=== OIDC env vars ==="
+          echo "ACTIONS_ID_TOKEN_REQUEST_URL  = ${ACTIONS_ID_TOKEN_REQUEST_URL:-<NOT SET>}"
+          echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN present: ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+yes}"
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+            echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN = <NOT SET>"
+          fi
+          echo ""
+          if [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ] && [ -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ]; then
+            echo "=== Attempting OIDC token request ==="
+            URL="$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange"
+            HTTP=$(curl -s -o /tmp/oidc_body.json -w "%{http_code}" \
+              -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "$URL")
+            echo "HTTP status code: $HTTP"
+            cat /tmp/oidc_body.json; echo ""
+            if [ "$HTTP" = "200" ]; then
+              TOKEN=$(jq -r '.value' /tmp/oidc_body.json)
+              echo ""
+              echo "=== Token obtained! length = ${#TOKEN} chars ==="
+              echo "--- JWT payload decoded ---"
+              PAYLOAD=$(echo "$TOKEN" | cut -d'.' -f2)
+              echo "$PAYLOAD" | python3 -c "
+import base64, json, sys
+p = sys.stdin.read().strip()
+p += '=' * (-len(p) % 4)
+print(json.dumps(json.loads(base64.urlsafe_b64decode(p)), indent=2))
+"
+            else
+              echo ">>> FAILED to obtain OIDC token <<<"
+            fi
+          else
+            echo ">>> OIDC token NOT available for event: $GITHUB_EVENT_NAME <<<"
+          fi
