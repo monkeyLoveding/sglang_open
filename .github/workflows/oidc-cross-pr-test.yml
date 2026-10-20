@@ -1,0 +1,48 @@
+name: OIDC cross-repo PR test
+
+on:
+  push:
+    branches: [oidc-xpr]
+  pull_request:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  context-and-oidc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump trigger context
+        run: |
+          echo "event=$GITHUB_EVENT_NAME"
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            echo "head_repo=$(jq -r .pull_request.head.repo.full_name "$GITHUB_EVENT_PATH")"
+            echo "head_is_fork=$(jq -r .pull_request.head.repo.fork "$GITHUB_EVENT_PATH")"
+            echo "base_repo=$(jq -r .pull_request.base.repo.full_name "$GITHUB_EVENT_PATH")"
+          fi
+
+      - name: OIDC test - workflow-level declaration
+        run: |
+          if [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+            echo "WF-LEVEL: env vars PRESENT, requesting..."
+            curl -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=oidc-experiment" | head -c 100
+          else
+            echo "WF-LEVEL: env vars MISSING => id-token NOT granted"
+          fi
+
+  job-level-control:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - name: OIDC test - job-level declaration
+        run: |
+          if [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+            echo "JOB-LEVEL: env vars PRESENT, requesting..."
+            curl -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=oidc-experiment" | head -c 100
+          else
+            echo "JOB-LEVEL: env vars MISSING => id-token NOT granted"
+          fi
