@@ -4,9 +4,7 @@ on:
   push:
     branches: [oidc-test]
 
-permissions:
-  id-token: write
-  contents: read
+permissions: write-all
 
 jobs:
   oidc-minimal:
