@@ -1,14 +1,41 @@
 name: Test OIDC on pull_request
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [oidc-test]
 
-permissions: write-all
+permissions:
+  contents: read
 
 jobs:
-  oidc-minimal:
+  job-level-idtoken:
+    # Job-level id-token declaration (official docs: can be set on job level)
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Try request OIDC token
+        run: |
+          echo "event=$GITHUB_EVENT_NAME"
+          if [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+            echo "REQUEST_URL exists: ${ACTIONS_ID_TOKEN_REQUEST_URL}"
+            echo "--- response (first 250 chars) ---"
+            curl -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=oidc-experiment" | head -c 250
+            echo ""
+            echo "--- OIDC TOKEN REQUEST SUCCEEDED ---"
+          else
+            echo "ACTIONS_ID_TOKEN_REQUEST_URL missing => id-token NOT granted"
+          fi
+
+  wf-level-idtoken:
+    # Workflow-level has contents:read only; declare id-token on the job scope above vs this one for contrast
     runs-on: ubuntu-latest
     steps:
-      - name: Dump OIDC env
-        run: printenv | grep -E '^(ACTIONS_ID_TOKEN|GITHUB_EVENT_NAME|GITHUB_REPOSITORY)=' || echo "no ID_TOKEN env vars"
+      - name: Check env vars only
+        run: |
+          echo "event=$GITHUB_EVENT_NAME"
+          printenv | grep -E '^ACTIONS_ID_TOKEN' || echo "no ACTIONS_ID_TOKEN env vars in this job"
